@@ -23,5 +23,16 @@ class Task(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     user: Mapped["User"] = relationship()
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), nullable=True)
+    category: Mapped["Category"] = relationship()
     done: Mapped[bool] = mapped_column(Boolean())
     text: Mapped[str] = mapped_column(String())
+
+
+class Category(Base):
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    user: Mapped["User"] = relationship()
+    name: Mapped[str] = mapped_column(String())
