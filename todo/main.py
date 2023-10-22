@@ -1,6 +1,8 @@
 from hashlib import md5
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, HTTPException, Header, Request, Response
+from fastapi.security import OAuth2PasswordBearer
 import jwt
 
 from .db import DataBase
@@ -9,6 +11,7 @@ from . import exceptions
 
 app = FastAPI()
 db = DataBase()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 def hash_password(password: str) -> str:
@@ -43,3 +46,38 @@ def user(username: str):
         db.remove_user(username)
     except exceptions.UserDoesNotExist:
         raise HTTPException(404, f"User with username {username} does not exists")
+
+
+@app.post("/task")
+def add_task(
+    token: Annotated[str, Depends(oauth2_scheme)], text: str, done: bool = False
+):
+    jwt_payload = jwt.decode(token, "secret", ["HS256"])
+
+    user = db.get_user(jwt_payload["id"])
+    task = db.add_task(user, done, text)
+
+    return {"task_id": task.id}
+
+
+@app.get("/task")
+def get_tasks(
+    token: Annotated[str, Depends(oauth2_scheme)], task_ids: list[str] = None
+):
+    jwt_payload = jwt.decode(token, "secret", ["HS256"])
+    user = db.get_user(jwt_payload["id"])
+
+    return db.get_tasks(user, task_ids)
+
+
+@app.patch("/task")
+def edit_task(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    task_id: int,
+    text: str = None,
+    done: bool = None,
+):
+    jwt_payload = jwt.decode(token, "secret", ["HS256"])
+    user_id = jwt_payload["id"]
+
+    db.update_task(user_id, task_id, text, done)
