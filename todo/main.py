@@ -4,14 +4,25 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
+from sqlalchemy import URL, create_engine, StaticPool
+from sqlalchemy.orm import Session
 
-from .db import DataBase
-from . import exceptions
+from . import models
 
 
 app = FastAPI()
-db = DataBase()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+db_url = URL.create(
+    "postgresql",
+    "postgres",
+    "password",
+    "0.0.0.0",
+    5432,
+)
+
+db_engine = create_engine(db_url, connect_args={}, poolclass=StaticPool, echo=True)
+models.Base.metadata.create_all(db_engine)
 
 
 def hash_password(password: str) -> str:
@@ -20,20 +31,24 @@ def hash_password(password: str) -> str:
 
 @app.post("/user")
 def user(username: str, password: str, status_code=status.HTTP_201_CREATED):
-    try:
-        user = db.add_user(username, hash_password(password))
-        return jwt.encode({"id": user.id}, "secret")
-    except exceptions.UserAlreadyExists:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, f"User with username {username} already exists"
-        )
+    with Session(db_engine) as session:
+        if session.query(models.User).where(models.User.username == username).count():
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"User with username {username} already exists",
+            )
+
+        user = models.User(username=username, password_hash=hash_password(password))
+        session.add(user)
+        session.commit()
 
 
 @app.get("/user")
 def user(username: str, password: str):
-    try:
-        user = db.get_user_by_username(username)
-    except exceptions.UserDoesNotExist:
+    with Session(db_engine) as session:
+        user = db_engine.query(models.User).filter_by(username=username).first()
+
+    if not user:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND, f"User with username {username} does not exists"
         )
@@ -46,12 +61,17 @@ def user(username: str, password: str):
 
 @app.delete("/user")
 def user(username: str):
-    try:
-        db.remove_user(username)
-    except exceptions.UserDoesNotExist:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, f"User with username {username} does not exists"
-        )
+    with Session(db_engine) as session:
+        user = db_engine.query(models.User).filter_by(username=username).first()
+
+        if not user:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                f"User with username {username} does not exists",
+            )
+
+        session.delete(user)
+        session.commit()
 
 
 @app.post("/task")
@@ -63,23 +83,44 @@ def add_task(
 ):
     jwt_payload = jwt.decode(token, "secret", ["HS256"])
 
-    user = db.get_user(jwt_payload["id"])
-    task = db.add_task(user, done, text)
+    with Session(db_engine) as session:
+        task = models.Task(user_id=jwt_payload["id"], done=done, text=text)
+        session.add(task)
+        session.commit()
 
-    return {"task_id": task.id}
+        return {
+            "id": task.id,
+        }
 
 
 @app.get("/task")
-def get_tasks(
-    token: Annotated[str, Depends(oauth2_scheme)], task_ids: list[str] = None
-):
+def get_tasks(token: Annotated[str, Depends(oauth2_scheme)]):
     jwt_payload = jwt.decode(token, "secret", ["HS256"])
-    user = db.get_user(jwt_payload["id"])
 
-    return db.get_tasks(user, task_ids)
+    with Session(db_engine) as session:
+        tasks = session.query(models.Task).filter_by(user_id=jwt_payload["id"]).all()
+
+    return tasks
 
 
-@app.patch("/task")
+@app.get("/task/{task_id}")
+def get_tasks(token: Annotated[str, Depends(oauth2_scheme)], task_id: str = None):
+    jwt_payload = jwt.decode(token, "secret", ["HS256"])
+
+    with Session(db_engine) as session:
+        task = (
+            session.query(models.Task)
+            .filter_by(user_id=jwt_payload["id"], id=task_id)
+            .first()
+        )
+
+    if task:
+        return task
+    else:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Task does not exist")
+
+
+@app.patch("/task/{task_id}")
 def edit_task(
     token: Annotated[str, Depends(oauth2_scheme)],
     task_id: int,
@@ -87,6 +128,19 @@ def edit_task(
     done: bool = None,
 ):
     jwt_payload = jwt.decode(token, "secret", ["HS256"])
-    user_id = jwt_payload["id"]
 
-    db.update_task(user_id, task_id, text, done)
+    with Session(db_engine) as session:
+        task = (
+            session.query(models.Task)
+            .filter_by(id=task_id, user_id=jwt_payload["id"])
+            .first()
+        )
+
+        if not task:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Task does not exist")
+
+        if text:
+            task.text = text
+        if done:
+            task.done = done
+        session.commit()
