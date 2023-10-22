@@ -29,8 +29,8 @@ def hash_password(password: str) -> str:
     return md5(password.encode()).hexdigest()
 
 
-@app.post("/user")
-def user(username: str, password: str, status_code=status.HTTP_201_CREATED):
+@app.post("/user", status_code=status.HTTP_201_CREATED)
+def user(username: str, password: str):
     with Session(db_engine) as session:
         if session.query(models.User).where(models.User.username == username).count():
             raise HTTPException(
@@ -74,12 +74,11 @@ def user(username: str):
         session.commit()
 
 
-@app.post("/task")
+@app.post("/task", status_code=status.HTTP_201_CREATED)
 def add_task(
     token: Annotated[str, Depends(oauth2_scheme)],
     text: str,
     done: bool = False,
-    status_code=status.HTTP_201_CREATED,
 ):
     jwt_payload = jwt.decode(token, "secret", ["HS256"])
 
