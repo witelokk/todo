@@ -87,15 +87,25 @@ def get_tasks(user: user_dependency, db: db_dependency) -> list[Task]:
 
 
 @router.get("/{task_id}")
-def get_task(
-    user: user_dependency, db: db_dependency, task_id: str = None
-) -> list[Task]:
+def get_task(user: user_dependency, db: db_dependency, task_id: str = None) -> Task:
     task = db.query(models.Task).filter_by(user_id=user["id"], id=task_id).first()
 
     if task:
         return Task.from_db(task)
     else:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Task does not exist")
+
+
+@router.get("/category/{category_id}")
+def get_tasks_by_category(
+    user: user_dependency, db: db_dependency, category_id: str = None
+) -> list[Task]:
+    tasks = (
+        db.query(models.Task)
+        .filter_by(user_id=user["id"], category_id=category_id)
+        .all()
+    )
+    return [Task.from_db(task) for task in tasks]
 
 
 @router.patch("/{task_id}")
