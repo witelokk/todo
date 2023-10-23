@@ -12,6 +12,8 @@ uvicorn = {extras = ["standard"], version = "^0.27.1"}
 sqlalchemy = "^2.0.27"
 psycopg2 = "^2.9.9"
 pyjwt = "^2.8.0"
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-multipart = "^0.0.9"
 
 
 [build-system]
