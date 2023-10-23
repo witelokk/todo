@@ -149,6 +149,23 @@ def edit_task(
         session.commit()
 
 
+@app.delete("/task/{task_id}")
+def delete_task(token: Annotated[str, Depends(oauth2_scheme)], task_id: str = None):
+    jwt_payload = jwt.decode(token, "secret", ["HS256"])
+
+    with Session(db_engine) as session:
+        task = (
+            session.query(models.Task)
+            .filter_by(user_id=jwt_payload["id"], id=task_id)
+            .first()
+        )
+
+        if task:
+            session.delete(task)
+        else:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Task does not exist")
+
+
 @app.post("/category")
 def add_category(
     token: Annotated[str, Depends(oauth2_scheme)],
