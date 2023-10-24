@@ -1,26 +1,15 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 from . import models
 from . import auth
-from .database import SessionLocal
+from .database import db_dependency
 
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
-def get_db():
-    db = SessionLocal()
-
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(auth.get_current_user)]
 
 

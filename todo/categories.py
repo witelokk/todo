@@ -1,26 +1,15 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 from . import models
 from . import auth
-from .database import SessionLocal
+from .database import db_dependency
 
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
 
-def get_db():
-    db = SessionLocal()
-
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(auth.get_current_user)]
 
 
@@ -105,6 +94,10 @@ def delete_category(
 
     if not category:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Category is not found")
+
+    category_tasks = db.query(models.Task).filter_by(category_id=category_id).all()
+    for task in category_tasks:
+        task.category = None
 
     db.delete(category)
     db.commit()

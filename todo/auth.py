@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from . import models
-from .database import SessionLocal
+from .database import db_dependency
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -30,18 +30,6 @@ class CreateUserRequest(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
-
-
-def get_db():
-    db = SessionLocal()
-
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-db_dependency = Annotated[Session, Depends(get_db)]
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
