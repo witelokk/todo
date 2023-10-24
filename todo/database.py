@@ -1,3 +1,4 @@
+from os import environ
 from typing import Annotated
 from fastapi import Depends
 from sqlalchemy import URL, StaticPool, create_engine
@@ -7,10 +8,10 @@ from sqlalchemy.ext.declarative import declarative_base
 
 url = URL.create(
     "postgresql",
-    "postgres",
-    "password",
-    "0.0.0.0",
-    5432,
+    environ["POSTGRES_USERNAME"],
+    environ["POSTGRES_PASSWORD"],
+    environ["POSTGRES_HOST"],
+    int(environ["POSTGRES_PORT"]),
 )
 
 engine = create_engine(url, connect_args={}, poolclass=StaticPool, echo=True)
