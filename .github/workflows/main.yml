@@ -1,0 +1,49 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    env:
+      DATABASE_URL: sqlite://
+      SECRET_KEY: ci-test-key-not-for-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install poetry==2.2.1
+      - run: poetry install --no-interaction
+      - name: Run tests
+        run: poetry run pytest -v --junitxml=test-results.xml
+      - name: Build package and documentation
+        run: |
+          poetry build
+          poetry run python scripts/build_docs.py
+      - name: Deploy to localhost and check HTTP endpoints
+        run: |
+          poetry run uvicorn todo.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/openapi.json -o /tmp/openapi.json; then break; fi
+            sleep 1
+          done
+          python -c 'import json; d=json.load(open("/tmp/openapi.json")); assert "/tasks/" in d["paths"]; print("Localhost deployment OK")'
+          curl --fail http://127.0.0.1:8000/docs > /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-python-${{ matrix.python }}
+          path: |
+            test-results.xml
+            site/
+            dist/
+            server.log

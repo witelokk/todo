@@ -55,3 +55,13 @@ A simple Todo application built with FastAPI.
 - `DELETE /categories/{category_id}`: Delete Category
 
 You can get more information about these endpoints using docs at /docs.
+
+## CI/CD
+
+[![CI](https://github.com/witelokk/todo/actions/workflows/main.yml/badge.svg)](https://github.com/witelokk/todo/actions/workflows/main.yml)
+
+Install dependencies with `poetry install`, then run `poetry run pytest -v`.
+For a local demonstration, set `DATABASE_URL=sqlite:///./todo.db` and a private
+`SECRET_KEY`, then run `poetry run python -m todo`.
+See [the development guide](docs/ci-cd.md) for CI, automatic merging, release
+preparation and generation of the offline API reference.

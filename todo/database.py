@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 
 
-url = URL.create(
+url = environ.get("DATABASE_URL") or URL.create(
     "postgresql",
     environ["POSTGRES_USERNAME"],
     environ["POSTGRES_PASSWORD"],
@@ -14,7 +14,12 @@ url = URL.create(
     int(environ["POSTGRES_PORT"]),
 )
 
-engine = create_engine(url, connect_args={}, poolclass=StaticPool, echo=True)
+is_sqlite = str(url).startswith("sqlite")
+engine = create_engine(
+    url,
+    connect_args={"check_same_thread": False} if is_sqlite else {},
+    **({"poolclass": StaticPool} if is_sqlite else {}),
+)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
