@@ -1,4 +1,5 @@
 from fastapi import Depends, FastAPI
+from importlib.metadata import version
 from sqlalchemy.orm import Session
 
 from . import auth, tasks, categories
@@ -14,7 +15,7 @@ def get_db():
         db.close()
 
 
-app = FastAPI()
+app = FastAPI(title="Todo API", version=version("todo"))
 app.include_router(auth.router)
 app.include_router(tasks.router)
 app.include_router(categories.router)
