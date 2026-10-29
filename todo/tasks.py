@@ -47,9 +47,10 @@ class Task(BaseModel):
 def add_task(
     user: user_dependency, db: db_dependency, create_task_request: CreateTaskRequest
 ) -> Task:
-    if (
-        db.query(models.Category).filter_by(id=create_task_request.category_id).first()
-        is None
+    if create_task_request.category_id is not None and (
+        db.query(models.Category)
+        .filter_by(id=create_task_request.category_id, user_id=user["id"])
+        .first() is None
     ):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -59,7 +60,7 @@ def add_task(
     task = models.Task(
         user_id=user["id"],
         done=create_task_request.done,
-        text=create_task_request.done,
+        text=create_task_request.text,
         category_id=create_task_request.category_id,
     )
     db.add(task)
